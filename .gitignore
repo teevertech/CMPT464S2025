@@ -1,52 +1,19 @@
-# Prerequisites
-*.d
+.gdbinit
 
-# Object files
-*.o
-*.ko
-*.obj
-*.elf
+Image.hex
 
-# Linker output
-*.ilk
-*.map
-*.exp
+Image.map
 
-# Precompiled Headers
-*.gch
-*.pch
+Image.objdump
 
-# Libraries
-*.lib
-*.a
-*.la
-*.lo
+Image
 
-# Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
+Image.out
 
-# Executables
-*.exe
-*.out
-*.app
-*.i*86
-*.x86_64
-*.hex
+/KTMP/*
 
-# Debug files
-*.dSYM/
-*.su
-*.idb
-*.pdb
+Makefile
 
-# Kernel Module Compile Results
-*.mod*
-*.cmd
-.tmp_versions/
-modules.order
-Module.symvers
-Mkfile.old
-dkms.conf
+.mop
+
+data.xml
