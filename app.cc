@@ -123,25 +123,37 @@ fsm root {
 	state SHOW_LOCAL_RECORDS:
 			ser_outf(SHOW_LOCAL_RECORDS, "Index\t Time Stamp\t owner ID\t Record Data\r\n");
 			
-			for (int index = 0; index < databaseSize; index++){
-				if (nodeDatabase[index].aNode != NULL){  // It shouldn't be invalid, but why not be safe
-					int curNodeID = nodeDatabase[index].aNode->nodeID;
-					int timeStamp = nodeDatabase[index].timeStamp;
+			if (databaseSize >= 0 && <= MAX_DATABASE_SIZE){
+				for (int index = 0; index < databaseSize; index++){
+					if (nodeDatabase[index].aNode != NULL){  // It shouldn't be invalid, but why not be safe
+						int curNodeID = nodeDatabase[index].aNode->nodeID;
+						int timeStamp = nodeDatabase[index].timeStamp;
 
-					char *record = nodeDatabase[index].record;
+						char *record = nodeDatabase[index].record;
 
-					ser_outf(SHOW_LOCAL_RECORDS, "%d, %d, %d, %s\n\r",
-											index,
-											nodeDatabase[index].aNode->nodeID - '0',
-											nodeDatabase[index].timeStamp,
-										    nodeDatabase[index].record
-											);
+						ser_outf(SHOW_LOCAL_RECORDS, "%d, %d, %d, %s\n\r",
+												index,
+												nodeDatabase[index].aNode->nodeID - '0',
+												nodeDatabase[index].timeStamp,
+											    nodeDatabase[index].record
+												);
+					}
 				}
 			}
 
 		proceed PRINT_MENU;
 
 	state RESET_LOCAL_RECORDS:
+
+		for (int index = 0; index < databaseSize; index++){
+			// delete stuff.
+			nodeDatabase[index].aNode->GroupID[0] = ' ';
+			nodeDatabase[index].aNode->GroupID[1] = ' ';
+			nodeDatabase[index].aNode->NodeID = '0';
+			nodeDatabase[index].timeStamp = 0;
+			nodeDatabase[index].record = '';
+		}
+		databaseSize = 0;
 
 		proceed PRINT_MENU;
 
