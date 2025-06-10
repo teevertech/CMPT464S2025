@@ -7,7 +7,31 @@
 #include "ser.h"
 #include "serf.h"
 
+#define MAX_PACKET_SIZE 	(250) // Bytes
+#define MAX_DATABASE_SIZE 	 (40) // Maximum 40 Nodes in the DB
+#define MAX_RECORD_SIZE 	 (20) // Maximum 20 byte record
+#define DEFAULT_NETWORK_ID    (0) // Always 0 in this assignment
+
+struct Node {
+	char groupID[2];
+	char nodeID;
+};
+
+struct DB_Entry {
+	struct Node *aNode;
+	int timeStamp;
+	char record[MAX_RECORD_SIZE];
+};
+
+
+
+int databaseSize = 0;									// current DB size
+struct Node thisNode;			  						// The data for this particular node
+struct DB_Entry nodeDatabase[MAX_DATABASE_SIZE];       // the DB that holds other node information
+
+
 char menu_choice = ' ';
+
 
 fsm root {
 	state PRINT_MENU:
@@ -97,6 +121,23 @@ fsm root {
 		proceed PRINT_MENU;
 
 	state SHOW_LOCAL_RECORDS:
+			ser_outf(SHOW_LOCAL_RECORDS, "Index\t Time Stamp\t owner ID\t Record Data\r\n");
+			
+			for (int index = 0; index < databaseSize; index++){
+				if (nodeDatabase[index].aNode != NULL){  // It shouldn't be invalid, but why not be safe
+					int curNodeID = nodeDatabase[index].aNode->nodeID;
+					int timeStamp = nodeDatabase[index].timeStamp;
+
+					char *record = nodeDatabase[index].record;
+
+					ser_outf(SHOW_LOCAL_RECORDS, "%d, %d, %d, %s\n\r",
+											index,
+											nodeDatabase[index].aNode->nodeID - '0',
+											nodeDatabase[index].timeStamp,
+										    nodeDatabase[index].record
+											);
+				}
+			}
 
 		proceed PRINT_MENU;
 
