@@ -11,6 +11,11 @@
 #define MAX_DATABASE_SIZE 	 (40) // Maximum 40 Nodes in the DB
 #define MAX_RECORD_SIZE 	 (20) // Maximum 20 byte record
 #define DEFAULT_NETWORK_ID    (0) // Always 0 in this assignment
+#define MAX_NEIGHBORS 		 (25) // This is simply a placeholder value ****** could switch to using MAX_DATABSE_SIZE isntead ******
+
+static uint8_t neighborList[MAX_NEIGHBORS];
+static int neighborCount = 0;
+static uint8_t requestCount = 0;
 
 struct Node {
 	char groupID[2];
@@ -23,6 +28,25 @@ struct DB_Entry {
 	char record[MAX_RECORD_SIZE];
 };
 
+typedef struct __attribute__((packed)) {
+	uint16_t groupID;
+	uint8_t type;
+	uint8_t request_num;
+	uint8_t senderID;
+	uint8_t receiverID;
+} message_header_t; 
+
+// convert the ASCII groupID to numeric
+static uint16_t getGroupID(void) {
+	return (thisNode.groupID[0] - '0') * 10
+		 + (thisNode.groupID[1] - '0');
+}
+
+// convert thje ASCII nodeID to numveric
+static uint8_t getNodeID(void) {
+	return (thisNode.nodeID - '0');
+}
+
 
 int databaseSize = 0;									// current DB size
 struct DB_Entry nodeDatabase[MAX_DATABASE_SIZE];       // the DB that holds other node information
@@ -33,6 +57,57 @@ struct Node thisNode = {"00", ' '};		  						// The data for this particular nod
 //thisNode.nodeID     = '1';  // Set to '1' for now (need to confirm with instructor)
 
 char menu_choice = ' ';
+
+fsm Discovery {
+	state INIT:
+		// build and send the discovery message
+		message_header_t msg;
+		msg.groupID = getGroupID();
+		msg.type = 0; // always for discovery request
+		msg.request_num = requestCount++;
+		msg.senderID = getNodeID();
+		msg.receiverID = 0xFF; // broadcast 
+
+		RF_Send(&msg, sizeof(msg));
+		setTimer(3000); // 3 seconds to collect responses ****** confirm this is correct time calc ******
+		neighborCount = 0; // clear old list
+		transition(WAIT);
+	state WAIT:
+		uint8_t buffer[64];
+		int len = RF_Receive(buffer, sizeof(buffer), 100); // look for new packets, 100ms wait(could change this value)
+
+		if (len > 0) { // packet arrives
+			message_header_t *rx = (message_header_t *)buffer; 
+			if (rx->type == 1 && // check if correct discovery response
+				rx->getGroupID() == myGroupID) { // check correct group ****** might need to store myGroupID as a local uint16_t if calling the helper directly doesnt work ******
+				// avoid dupes
+				bool seen = false;
+				for (int i = 0; i < neighborCount; i++) {
+					if (neighborList[i] == rx->senderID) {
+						seen = true;
+						break;
+					}
+				}
+				if (!seen && neighborCount < MAX_NEIGHBORS) {
+					neighborList[neighborCount++] = rx->senderID;
+				}
+			}
+			again; // keep checking
+		} else if(timeout()) {
+			transition(DONE);
+		} else {
+			again; // nothing received, keep trying until 3s is up
+		}
+	state DONE:
+	// print over UART
+		ser_out(PRINT_MENU, "\r\nNeighbors: ");
+		for (int i = 0; i < neighborCount; i++) {
+			ser_outf(DONE, "%d ", neighborList[i]);
+		}
+		ser_out(DONE, "\r\n");
+		stop;
+}
+
 
 fsm root {
 	state PRINT_MENU:
@@ -68,7 +143,7 @@ fsm root {
 			case 'F': case 'f': // (F)ind Protocol
 				// Do this first
 				// And do the receiver side first
-				proceed FIND_NEIGHBOURS;
+				start Discovery;
 			
 			case 'C': case 'c': // (C)reate Protocol
 				ser_out(PRINT_MENU,"Enter new node ID: ");
@@ -165,3 +240,4 @@ fsm root {
 		proceed PRINT_MENU;
 
 }
+ 
