@@ -24,19 +24,20 @@ struct DB_Entry {
 };
 
 
-
 int databaseSize = 0;									// current DB size
-struct Node thisNode;			  						// The data for this particular node
 struct DB_Entry nodeDatabase[MAX_DATABASE_SIZE];       // the DB that holds other node information
 
+struct Node thisNode = {"00", ' '};		  						// The data for this particular node
+//thisNode.groupID[0] = '0';  // 
+//thisNode.groupID[1] = '1';  // Set to '1' for now (need to confirm with instructor)
+//thisNode.nodeID     = '1';  // Set to '1' for now (need to confirm with instructor)
 
 char menu_choice = ' ';
 
-
 fsm root {
 	state PRINT_MENU:
-		ser_out(PRINT_MENU, 
-			"\r\nGroup [node group ID] Device #[node id] ([number of stored records]/[maximum number of records] records)\r\n"
+		ser_outf(PRINT_MENU, 
+			"\r\nGroup %c%c Device #%c (%d/%d records)\r\n"
 			"(G)roup ID\r\n"
 			"(N)ew device ID\r\n"
 			"(C)reate record on neighbor\r\n"
@@ -44,7 +45,9 @@ fsm root {
 			"(R)etrieve record from neighbor\r\n"
 			"(S)how local records\r\n"
 			"R(e)set local storage\r\n\r\n"
-			"Selection: ");		
+			"Selection: ",
+			thisNode.groupID[0], thisNode.groupID[1], thisNode.nodeID, databaseSize, MAX_DATABASE_SIZE
+			);		
 		proceed MENU_SELECT;
 
 	state MENU_SELECT:
@@ -78,7 +81,7 @@ fsm root {
 				proceed DELETE_NEIGHBOUR_RECORD;
 			
 			case 'R': case 'r': // (R)etrieve Protocol
-				ser_out(PRINT_MENU,"Enter destination node ID and record Index to be retreived: ");
+				ser_out(PRINT_MENU,"Enter destination node ID and record Index to be retrieved: ");
 				
 				proceed RETREIVE_RECORD;
 			
@@ -123,7 +126,7 @@ fsm root {
 	state SHOW_LOCAL_RECORDS:
 			ser_outf(SHOW_LOCAL_RECORDS, "Index\t Time Stamp\t owner ID\t Record Data\r\n");
 			
-			if (databaseSize >= 0 && <= MAX_DATABASE_SIZE){
+			if ( (databaseSize >= 0) && (databaseSize <= MAX_DATABASE_SIZE) ) {
 				for (int index = 0; index < databaseSize; index++){
 					if (nodeDatabase[index].aNode != NULL){  // It shouldn't be invalid, but why not be safe
 						int curNodeID = nodeDatabase[index].aNode->nodeID;
@@ -145,14 +148,18 @@ fsm root {
 
 	state RESET_LOCAL_RECORDS:
 
-		for (int index = 0; index < databaseSize; index++){
+		for (int i = 0; i < databaseSize; i++){
 			// delete stuff.
-			nodeDatabase[index].aNode->GroupID[0] = ' ';
-			nodeDatabase[index].aNode->GroupID[1] = ' ';
-			nodeDatabase[index].aNode->NodeID = '0';
-			nodeDatabase[index].timeStamp = 0;
-			nodeDatabase[index].record = '';
+			nodeDatabase[i].aNode->groupID[0] = ' ';
+			nodeDatabase[i].aNode->groupID[1] = ' ';
+			nodeDatabase[i].aNode->nodeID = '0';
+			nodeDatabase[i].timeStamp = 0;
+			
+			for (int j = 0; j < MAX_RECORD_SIZE; j++){
+				nodeDatabase[i].record[j] = '\0';
+			}
 		}
+
 		databaseSize = 0;
 
 		proceed PRINT_MENU;
