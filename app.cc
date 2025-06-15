@@ -7,6 +7,11 @@
 #include "ser.h"
 #include "serf.h"
 
+#include "phys_cc1350.h"
+
+#include "tcv.h"
+#include "plug_null.h"
+
 #define MAX_PACKET_SIZE 	(250) // Bytes
 #define MAX_DATABASE_SIZE 	 (40) // Maximum 40 Nodes in the DB
 #define MAX_RECORD_SIZE 	 (20) // Maximum 20 byte record
