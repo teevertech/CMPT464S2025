@@ -1,1 +1,13 @@
 #define UART_RATE		9600
+#define	UART_DRIVER	1
+#define	CODE_LONG_INTS	1
+
+#ifdef 	TCV_PRESENT
+#undef 	TCV_PRESENT
+#define	TCV_PRESENT	0
+#endif
+
+#ifdef	CC1100
+#undef	CC1100
+#define	CC1100		0
+#endif
