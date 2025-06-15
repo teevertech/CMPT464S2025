@@ -9,6 +9,11 @@
 #include "plug_null.h"
 #include "tcv.h"
 
+#define MAX_PACKET_SIZE 	      (250) // Maximum size of transmitted packet in bytes
+#define MAX_DATABASE_SIZE 	       (40) // Maximum 40 Nodes in the DB
+#define MAX_RECORD_SIZE 	       (20) // Maximum 20 byte record
+#define DEFAULT_NETWORK_ID          (0) // Always 0 in this assignment
+
 // Message types
 #define MSG_DISCOVERY_REQUEST       (0)
 #define MSG_DISCOVERY_RESPONSE      (1)
@@ -24,11 +29,10 @@
 #define STATUS_DELETE_FAIL       (0x03) // delete operation fails as DB is already empty
 #define STATUS_RETRIEVE_FAIL     (0x04) // retrieve operation as DB entry is empty (no record stored)
 
-#define MAX_PACKET_SIZE 	      (250) // Bytes
-#define MAX_DATABASE_SIZE 	       (40) // Maximum 40 Nodes in the DB
-#define MAX_RECORD_SIZE 	       (20) // Maximum 20 byte record
-#define DEFAULT_NETWORK_ID          (0) // Always 0 in this assignment
 
+/****************************************************************************************************/
+// Message and Packet Data Structures
+//
 // Discovery Request Message:
 // Sent by the node to discover and obtain
 // the list of reachable neighbours that
@@ -109,6 +113,10 @@ typedef struct packet {
 
 } __attribute__((packed)) packet_t;
 
+/****************************************************************************************************/
+
+/****************************************************************************************************/
+// Database structs
 struct Node {
 	sint groupID;
 	byte nodeID;
@@ -119,17 +127,52 @@ struct DB_Entry {
 	int timeStamp;
 	char record[MAX_RECORD_SIZE];
 };
+/****************************************************************************************************/
 
-/**************************************************/
+/****************************************************************************************************/
 /* Global Variables for this particular node      */
 int databaseSize = 0;									// current DB size
 struct DB_Entry nodeDatabase[MAX_DATABASE_SIZE];        // the DB that holds other node information
 struct Node thisNode = {0, 0};		  				    // The data for this particular node
 char menu_choice = ' ';                                 // user selection in UART
-/**************************************************/
+
+int sfd = -1;
 
 
+
+/****************************************************************************************************/
+
+
+fsm receiver {
+    address aPacket;
+
+    state RECEIVING:
+        aPacket = tcv_rnp(RECEIVING, sfd);
+
+
+}
+
+// The root FSM of our program.
+// initializes the radio and receiver FSM  and then handles user input from UART
+// and coordination with receiver FSM
 fsm root {
+    // Runs once, sets up the radio stuff
+    state INITIALIZE:
+        phys_cc1350(0, MAX_PACKET_SIZE);        // Enable physical interface device
+        tcv_plug(0, &plug_null);                // Set plug
+        sfd = tcv_open(NONE, 0, 0);             // Open a new VNETI session
+
+        if (sfd < 0){
+            diag("Error opening TCV session!");
+            syserror(EASSERT, "No session available)");
+        }
+
+        tcv_control(sfd, PHYSOPT_ON, NULL);     // Enable control function
+
+        recv_thread = runfsm reciver;
+
+        proceed PRINT_MENU;
+
 	state PRINT_MENU:
 		ser_outf(PRINT_MENU,
 			"\r\nGroup %d Device #%c (%d/%d records)\r\n"
