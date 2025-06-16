@@ -136,6 +136,8 @@ byte neighbor_list[MAX_NEIGHBORS];
 int neighbor_count = 0;
 int discovery_round = 0;
 byte current_request_num = 0;
+int create_target = 0;  // Used to hold neighbors node ID between the two FSM states (will persist across transitions)
+int create_request_num = 0; // Used for 3s delay in neighbour ID & DATA states
 /**************************************************/
 
 // Helper function to get next request number
@@ -397,7 +399,7 @@ fsm root {
 
 			case 'C': case 'c': // (C)reate Protocol
 				ser_out(PARSE_CHOICE,"Enter new node ID: ");
-				proceed CREATE_NEIGHBOUR_RECORD;
+				proceed CREATE_NEIGHBOUR_RECORD_ID;
 
 			case 'D': case 'd': // (D)elete Protocol
 				ser_out(PARSE_CHOICE,"Enter new node ID: ");
@@ -434,8 +436,59 @@ fsm root {
 		proceed PRINT_MENU;
 
 	state CREATE_NEIGHBOUR_RECORD:
-		// TODO: Implement create record protocol
-		proceed PRINT_MENU;
+        // Declare a new FSM state for reading the nodeID
+        int temp;
+
+        ser_inf(CREATE_NEIGHBOUR_RECORD_ID, "%d", &temp); // Block until user enters number & hits enter -> parse it into temp
+        create_target = temp; 
+        ser_out(CREATE_NEIGHBOUR_RECORD_ID, "Enter record, maximum %d characters: ", MAX_RECORD_SIZE); // Asks for actual record data (curently shows buffer limit)
+        proceed CREATE_NEIGHBOUR_RECORD_DATA; 
+
+    state CREATE_NEIGHBOUR_RECORD_DATA: {
+        char buffer[MAX_RECORD_SIZE]; 
+        ser_inf(CREATE_NEIGHBOUR_RECORD_DATA, "%s", buffer);
+        
+        create_msg md; 
+        md.groupID = thisNode.groupID; // Attaches packet with nodes groupID
+        md.type = MSG_CREATE_RECORD; // Type = 2 
+        md.requestNum = get_next_request_num(); // Asks helper function for new # for matching
+        md.senderID = thisNode.nodeID; // Marks it as coming from own node
+        md.receiverID = create_target; // Directs the packet to the nieghbor ID we saved previously
+        create_request_num = cm.requestNum;
+        send_message(&cm, sizeof(cm));
+
+        // 3s timer to create response timeout
+        delay(3000, CREATE_RESPONSE_TIMEOUT); 
+        when(RECEIVE, HANDLE_CREATE_RESPONSE); // If packet arrives first we move to handle create response
+}
+    // Handle repsonse (if received within 3s window)
+    state HANDLE_CREATE_RESPONSE: {
+        address rpkt = tcv_rnp(HANDLE_CREATE_RESPONSE, sfd); 
+        if (!rpkt) {proceed CREATE_NEIGHBOUR_RECORD_DATA;}  // No packet yet
+        response_msg_t *resp = (response_msg_t*)(rpkt + 1);
+
+        // Only handle our own reply
+        if (resp->type == MSG_RESPONSE // only handle packets that are type 5 and match our request number
+            && resp->requestNum == create_request_num) {
+            if (resp->status == STATUS_SUCCESS)
+                ser_out(HANDLE_CREATE_RESPONSE, "Record created.\r\n");
+            else
+                ser_outf(HANDLE_CREATE_RESPONSE,
+                        "Create failed (0x%02X)\r\n",
+                        resp->status);
+            tcv_endp(rpkt); // Frees up the packet buffer
+            proceed PRINT_MENU;
+        }
+
+        // Otherwise drop and keep listening
+        tcv_endp(rpkt);
+        proceed CREATE_NEIGHBOUR_RECORD_DATA;
+    }
+
+    state CREATE_RESPONSE_TIMEOUT:
+        ser_out(CREATE_RESPONSE_TIMEOUT,
+                "Create record timed out after 3 s\r\n");
+        proceed PRINT_MENU;
 
 	state DELETE_NEIGHBOUR_RECORD:
 		// TODO: Implement delete record protocol
